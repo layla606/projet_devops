@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+
+    triggers {
+        // Optional: run automatically on push to dev branch
+        pollSCM('H/5 * * * *') // checks every 5 minutes, or configure webhook in GitHub
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo "Checking out code..."
+                checkout scm
+            }
+        }
+
+        stage('Setup') {
+            steps {
+                echo "Setting up environment..."
+                sh 'npm install || true' // adjust to your project
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing workspace files..."
+                sh 'pwd'
+                sh 'ls -la'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo "Building Docker image..."
+                // Explicitly specify Dockerfile
+                sh 'docker build -f Dockerfile -t projet_devops:dev .'
+            }
+        }
+
+        stage('Run Docker') {
+            steps {
+                echo "Running container..."
+                sh 'docker run --name projet_devops_dev -d -p 3000:3000 projet_devops:dev || true'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                script {
+                    echo "Running smoke test..."
+                    def result = sh(script: "curl -s http://localhost:3000 || true", returnStdout: true).trim()
+                    if (result) {
+                        echo "Smoke Test PASSED: ${result}"
+                    } else {
+                        error("Smoke Test FAILED")
+                    }
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo "Archiving build logs..."
+                sh 'echo "Build logs for dev pipeline" > build.log'
+                archiveArtifacts artifacts: 'build.log', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up Docker container..."
+            sh 'docker rm -f projet_devops_dev || true'
+        }
+        success {
+            echo "Pipeline SUCCESS"
+        }
+        failure {
+            echo "Pipeline FAILED"
+        }
+    }
+}
