@@ -63,3 +63,6 @@ pipeline {
         }
     }
 }
+echo "Force build $(date)" >> build.log
+git add build.log
+git commit -m "Force pipeline run"
