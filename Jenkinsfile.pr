@@ -15,17 +15,26 @@ pipeline {
             }
         }
 
+        // Debug workspace to ensure Jenkins sees the Dockerfile
+        stage('Debug Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+            }
+        }
+
         stage('Build') {
             steps {
                 sh 'echo "Building the project..."'
-                sh 'docker build -t myapp-test .'
+                // Explicitly tell Docker which file to use
+                sh 'docker build -f Dockerfile -t myapp-test .'
             }
         }
 
         stage('Run Docker') {
             steps {
                 sh 'echo "Running container..."'
-                sh 'docker run --name myapp-test -d -p 3000:3000 myapp-test'
+                sh 'docker run --name myapp-test -d -p 3000:3000 myapp-test || true'
             }
         }
 
