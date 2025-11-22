@@ -15,44 +15,44 @@ pipeline {
             }
         }
 
-        // Debug workspace to ensure Jenkins sees the Dockerfile
         stage('Debug Workspace') {
             steps {
                 bat 'cd'
                 bat 'dir'
+                bat 'docker --version'
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                bat 'echo Building the project...'
-                bat 'docker build -f Dockerfile -t myapp-test .'
+                bat 'docker build -t myapp-test .'
             }
         }
 
-        stage('Run Docker') {
+        stage('Run Container') {
             steps {
-                bat 'echo Running container...'
-                bat 'docker run --name myapp-test -d -p 3000:3000 myapp-test || exit /b 0'
+                bat 'docker run --name myapp-test -d -p 3000:3000 myapp-test'
             }
         }
 
         stage('Smoke Test') {
             steps {
                 script {
-                    def result = bat(script: 'curl -s http://localhost:3000 || exit /b 0', returnStdout: true).trim()
-                    if (result) {
-                        echo "Smoke Test PASSED: ${result}"
+                    def result = bat(script: 'curl -s http://localhost:3000', returnStdout: true).trim()
+
+                    if (!result) {
+                        error("❌ Smoke Test FAILED — No response from container")
                     } else {
-                        error("Smoke Test FAILED")
+                        echo "✔ Smoke Test PASSED"
+                        echo result
                     }
                 }
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('Archive Logs') {
             steps {
-                bat 'echo Build logs... > build.log'
+                bat 'echo Build complete > build.log'
                 archiveArtifacts artifacts: 'build.log', fingerprint: true
             }
         }

@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     triggers {
-        // Optional: run automatically on push to dev branch
-        pollSCM('H/5 * * * *') // checks every 5 minutes, or configure webhook in GitHub
+        // Optional: poll SCM every 5 minutes
+        pollSCM('H/5 * * * *')
     }
 
     stages {
@@ -18,51 +18,48 @@ pipeline {
         stage('Setup') {
             steps {
                 echo "Setting up environment..."
-                sh 'npm install || true' // adjust to your project
+                // npm install (ignore errors so pipeline continues)
+                bat 'call npm install || exit /b 0'
             }
         }
 
         stage('Debug Workspace') {
             steps {
                 echo "Listing workspace files..."
-                sh 'pwd'
-                sh 'ls -la'
+                bat 'cd'
+                bat 'dir'
             }
         }
 
         stage('Build') {
             steps {
                 echo "Building Docker image..."
-                // Explicitly specify Dockerfile
-                sh 'docker build -f Dockerfile -t projet_devops:dev .'
+                bat 'docker build -f Dockerfile -t projet_devops:dev .'
             }
         }
 
         stage('Run Docker') {
             steps {
                 echo "Running container..."
-                sh 'docker run --name projet_devops_dev -d -p 3000:3000 projet_devops:dev || true'
+                // "call" ensures batch exits correctly
+                bat 'call docker run --name projet_devops_dev -d -p 3000:3000 projet_devops:dev || exit /b 0'
             }
         }
 
         stage('Smoke Test') {
             steps {
-                script {
-                    echo "Running smoke test..."
-                    def result = sh(script: "curl -s http://localhost:3000 || true", returnStdout: true).trim()
-                    if (result) {
-                        echo "Smoke Test PASSED: ${result}"
-                    } else {
-                        error("Smoke Test FAILED")
-                    }
-                }
+                echo "Running smoke test..."
+                // Use PowerShell for HTTP request
+                bat '''
+                    powershell -Command "try { $r = Invoke-WebRequest http://localhost:3000; Write-Output 'PASSED'; exit 0 } catch { Write-Output 'FAILED'; exit 1 }"
+                '''
             }
         }
 
         stage('Archive Artifacts') {
             steps {
                 echo "Archiving build logs..."
-                sh 'echo "Build logs for dev pipeline" > build.log'
+                bat 'echo Build logs for dev pipeline > build.log'
                 archiveArtifacts artifacts: 'build.log', fingerprint: true
             }
         }
@@ -71,7 +68,7 @@ pipeline {
     post {
         always {
             echo "Cleaning up Docker container..."
-            sh 'docker rm -f projet_devops_dev || true'
+            bat 'call docker rm -f projet_devops_dev || exit /b 0'
         }
         success {
             echo "Pipeline SUCCESS"
