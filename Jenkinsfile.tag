@@ -1,9 +1,13 @@
 pipeline {
     agent any
 
-    // Trigger on version tags only
+    // Default GIT_TAG if not running on a tag
+    environment {
+        GIT_TAG = "${env.GIT_TAG ?: 'dev-latest'}"
+    }
+
+    // Trigger on all commits, you can filter tags if needed
     triggers {
-        // Optional: Poll SCM if you can't use webhook
         pollSCM('H/5 * * * *')
     }
 
@@ -17,7 +21,7 @@ pipeline {
 
         stage('Version Tag Check') {
             when {
-                tag "v*.*.*"
+                expression { return env.GIT_TAG != 'dev-latest' }
             }
             steps {
                 echo "Running pipeline for version tag: ${env.GIT_TAG}"
@@ -35,15 +39,14 @@ pipeline {
             steps {
                 echo "Building project..."
                 bat 'echo Simulate build process'
-                // For example: bat 'mvn clean package' for Java, or 'npm install && npm run build'
             }
         }
 
         stage('Run Docker') {
             steps {
                 echo "Building & running Docker image..."
-                bat 'docker build -t myapp:${GIT_TAG} .'
-                bat 'docker run --name myapp_container -d myapp:${GIT_TAG}'
+                bat "docker build -t myapp:${env.GIT_TAG} ."
+                bat "docker run --name myapp_container -d myapp:${env.GIT_TAG}"
             }
         }
 
