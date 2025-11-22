@@ -7,16 +7,20 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
-    // Only run on version tags vX.Y.Z
-    when {
-        tag "v*.*.*"
-    }
-
     stages {
         stage('Checkout') {
             steps {
                 echo "Checking out code..."
                 checkout scm
+            }
+        }
+
+        stage('Version Tag Check') {
+            when {
+                tag "v*.*.*"
+            }
+            steps {
+                echo "Running pipeline for version tag: ${env.GIT_TAG}"
             }
         }
 
