@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Setup') {
+            steps {
+                bat 'echo Setup OK'
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                bat 'cd'
+                bat 'dir'
+                bat 'docker --version'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t myapp-test .'
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                bat 'docker run --name myapp-test -d -p 3000:3000 myapp-test'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                script {
+                    def result = bat(script: 'curl -s http://localhost:3000', returnStdout: true).trim()
+
+                    if (!result) {
+                        error("❌ Smoke Test FAILED — No response from container")
+                    } else {
+                        echo "✔ Smoke Test PASSED"
+                        echo result
+                    }
+                }
+            }
+        }
+
+        stage('Archive Logs') {
+            steps {
+                bat 'echo Build complete > build.log'
+                archiveArtifacts artifacts: 'build.log', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        always {
+            bat 'docker rm -f myapp-test || exit /b 0'
+        }
+        success {
+            echo "Pipeline SUCCESS"
+        }
+        failure {
+            echo "Pipeline FAILED"
+        }
+    }
+}

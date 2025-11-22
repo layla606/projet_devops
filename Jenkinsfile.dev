@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    triggers {
+        // Optional: poll SCM every 5 minutes
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo "Checking out code..."
+                checkout scm
+            }
+        }
+
+        stage('Setup') {
+            steps {
+                echo "Setting up environment..."
+                // npm install (ignore errors so pipeline continues)
+                bat 'call npm install || exit /b 0'
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing workspace files..."
+                bat 'cd'
+                bat 'dir'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo "Building Docker image..."
+                bat 'docker build -f Dockerfile -t projet_devops:dev .'
+            }
+        }
+
+        stage('Run Docker') {
+            steps {
+                echo "Running container..."
+                // "call" ensures batch exits correctly
+                bat 'call docker run --name projet_devops_dev -d -p 3000:3000 projet_devops:dev || exit /b 0'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                echo "Running smoke test..."
+                // Use PowerShell for HTTP request
+                bat '''
+                    powershell -Command "try { $r = Invoke-WebRequest http://localhost:3000; Write-Output 'PASSED'; exit 0 } catch { Write-Output 'FAILED'; exit 1 }"
+                '''
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo "Archiving build logs..."
+                bat 'echo Build logs for dev pipeline > build.log'
+                archiveArtifacts artifacts: 'build.log', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up Docker container..."
+            bat 'call docker rm -f projet_devops_dev || exit /b 0'
+        }
+        success {
+            echo "Pipeline SUCCESS"
+        }
+        failure {
+            echo "Pipeline FAILED"
+        }
+    }
+}
